@@ -9,9 +9,6 @@
     android:clipToPadding="true"
     tools:context="com.example.admin.mybledemo.activity.BleActivity">
 
-    <include android:id="@+id/toolbar_main"
-        layout="@layout/toolbar_layout"/>
-
     <!--<android.support.v7.widget.RecyclerView-->
         <!--android:id="@+id/recycle_listView"-->
         <!--android:layout_width="match_parent"-->
@@ -19,8 +16,7 @@
     <LinearLayout
         android:id="@+id/ll_function"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/toolbar_main">
+        android:layout_height="wrap_content">
 
         <Button
             android:id="@+id/sendData"
@@ -71,19 +67,25 @@
         android:layout_toEndOf="@+id/cancelEntity"
         android:text="测试页面" />
 
+    <Button
+        android:id="@+id/startAdvertise"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/sendEntityData"
+        android:text="开启广播"/>
+
+    <Button
+        android:id="@+id/stopAdvertise"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/sendEntityData"
+        android:layout_toRightOf="@+id/startAdvertise"
+        android:text="停止广播"/>
+
     <ListView
         android:id="@+id/listView"
-        android:layout_below="@id/sendEntityData"
+        android:layout_below="@id/startAdvertise"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
-
-    <!--<FrameLayout-->
-        <!--android:layout_below="@id/toolbar_main"-->
-        <!--android:layout_width="match_parent"-->
-        <!--android:layout_height="match_parent">-->
-
-        <!--<include layout="@layout/custom_drawerlayout" />-->
-
-    <!--</FrameLayout>-->
 
 </RelativeLayout>

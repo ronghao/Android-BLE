@@ -8,9 +8,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.annotation.IntRange;
+import android.support.annotation.RequiresApi;
 import android.util.Log;
 
 import java.lang.reflect.GenericArrayType;
@@ -19,6 +21,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 
 import cn.com.heaton.blelibrary.ble.callback.BleConnectCallback;
@@ -29,6 +32,7 @@ import cn.com.heaton.blelibrary.ble.callback.BleReadRssiCallback;
 import cn.com.heaton.blelibrary.ble.callback.BleScanCallback;
 import cn.com.heaton.blelibrary.ble.callback.BleWriteCallback;
 import cn.com.heaton.blelibrary.ble.callback.BleWriteEntityCallback;
+import cn.com.heaton.blelibrary.ble.model.BleDevice;
 import cn.com.heaton.blelibrary.ble.request.ConnectRequest;
 import cn.com.heaton.blelibrary.ble.exception.BleServiceException;
 import cn.com.heaton.blelibrary.ble.proxy.RequestImpl;
@@ -41,7 +45,7 @@ import cn.com.heaton.blelibrary.ble.request.ScanRequest;
  * 这个类对外提供所有的蓝牙操作API
  * Created by jerry on 2016/12/7.
  */
-public class Ble<T extends BleDevice> implements BleLisenter<T>{
+public class Ble<T extends BleDevice> {
 
     /** Log tag, apps may override it. */
     private final static String TAG = "Ble";
@@ -60,8 +64,6 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
     public static final int REQUEST_ENABLE_BT = 1;
 
     private BluetoothAdapter mBluetoothAdapter;
-
-    private ArrayList<T> mAutoDevices = new ArrayList<>();
 
     /**
      * Initializes a newly created {@code Ble} object so that it represents
@@ -87,16 +89,18 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
         //设置动态代理
         mRequest = (RequestLisenter) RequestProxy.getInstance()
                 .bindProxy(context, RequestImpl.getInstance(sOptions));
-        AutoConThread thread = new AutoConThread();
-        thread.start();
         boolean result = sInstance.startService(context);
         L.w(TAG, "bind service result is"+ result);
         return result;
     }
 
     public static Ble<BleDevice> create(Context context){
+        return create(context, options());
+    }
+
+    public static Ble<BleDevice> create(Context context, Options options){
         Ble<BleDevice> ble = getInstance();
-        ble.init(context, options());
+        ble.init(context, options);
         return ble;
     }
 
@@ -150,6 +154,24 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
         connect(device, null);
     }
 
+//    /**
+//     * 取消单个设备重连
+//     * @param device 设备对象
+//     */
+//    public void cancelReConnect(T device){
+//        ConnectRequest<T> request = Rproxy.getInstance().getRequest(ConnectRequest.class);
+//        if(request != null){
+//            request.cancelAutoConnect(device);
+//        }
+//    }
+
+    public void resetReConnect(T device, boolean autoConnect){
+        ConnectRequest<T> request = Rproxy.getInstance().getRequest(ConnectRequest.class);
+        if(request != null){
+            request.resetReConnect(device, autoConnect);
+        }
+    }
+
     /**
      * 断开蓝牙  无回调
      *
@@ -157,19 +179,6 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
      */
     public void disconnect(T device) {
         mRequest.disconnect(device);
-        synchronized (mLocker) {
-            if (mBluetoothLeService != null) {
-                //Traverse the connected device collection to disconnect automatically cancel the automatic connection
-                for (T bleDevice : getConnetedDevices()) {
-                    if (bleDevice.getBleAddress().equals(device.getBleAddress())) {
-                        L.e(TAG, "disconnect: " + "设置自动连接false");
-                        bleDevice.setAutoConnect(false);
-                    }
-                }
-//                mBluetoothLeService.disconnect(device.getBleAddress());
-//                RequestManager.executeDisConnectRequest(device);
-            }
-        }
     }
 
     /**
@@ -251,6 +260,21 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
 
     public void cancelWriteEntity(){
         mRequest.cancelWriteEntity();
+    }
+
+    /**
+     * 开始发送广播包
+     * @param payload 负载数据
+     */
+    public void startAdvertising(byte[] payload) {
+        mRequest.startAdvertising(payload);
+    }
+
+    /**
+     * 停止发送广播包
+     */
+    public void stopAdvertising() {
+        mRequest.stopAdvertising();
     }
 
 //    public boolean writeAutoEntity(T device, final byte[]data, int packLength){
@@ -440,70 +464,12 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
      */
 
     public ArrayList<T> getConnetedDevices() {
-        ConnectRequest request = Rproxy.getInstance().getRequest(ConnectRequest.class);
+        ConnectRequest<T> request = Rproxy.getInstance().getRequest(ConnectRequest.class);
         if(request != null){
             return request.getConnetedDevices();
         }
         return null;
     }
-
-    private class AutoConThread extends Thread {
-        @Override
-        public void run() {
-            while (sOptions.autoConnect) {
-                if (mAutoDevices.size() > 0) {
-                    //Turn on cyclic scan
-                    if (!isScanning()) {
-                        L.e(TAG, "run: " + "Thread began scanning...");
-                        startScan(null);
-                    }
-                }
-                SystemClock.sleep(2 * 1000);
-            }
-        }
-
-    }
-
-    /**
-     * If it is automatically connected device is removed from the automatic connection pool
-     *
-     * @param device Device object
-     */
-    public void removeAutoPool(BleDevice device) {
-        if (device == null) return;
-        Iterator<T> iterator = mAutoDevices.iterator();
-        while (iterator.hasNext()) {
-            BleDevice item = iterator.next();
-            if (device.getBleAddress().equals(item.getBleAddress())) {
-                iterator.remove();
-            }
-        }
-    }
-
-    /**
-     * Add a disconnected device to the autouppool
-     *
-     * @param device Device object
-     */
-    public void addAutoPool(T device) {
-        if (device == null) return;
-        Log.e(TAG, "addAutoPool: "+device.toString());
-        for (BleDevice item : mAutoDevices) {
-            if (device.getBleAddress().equals(item.getBleAddress())) {
-                L.w("addAutoPool:","自动连接池中已存在");
-                return;
-            }
-        }
-        if (device.isAutoConnect()) {
-            L.w(TAG, "addAutoPool: "+"Add automatic connection device to the connection pool");
-            mAutoDevices.add(device);
-        }
-    }
-
-    public ArrayList<T> getAutoDevices(){
-        return mAutoDevices;
-    }
-
 
     /**
      * 当Application退出时，释放所有资源
@@ -604,7 +570,6 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
         return sOptions;
     }
 
-
     /**
      * 蓝牙相关参数配置类
      */
@@ -624,11 +589,11 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
         /**
          * 蓝牙连接超时时长
          */
-        public int connectTimeout = 10 * 1000;
+        public long connectTimeout = 10 * 1000L;
         /**
          * 蓝牙扫描周期时长
          */
-        public int scanPeriod = 10 * 1000;
+        public long scanPeriod = 10 * 1000L;
         /**
          * 服务绑定失败重试次数
          */
@@ -637,8 +602,17 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
          * 蓝牙连接失败重试次数
          */
         public int connectFailedRetryCount = 3;
+        /**
+         * 是否过滤扫描设备
+         */
+        public boolean isFilterScan = false;
+        /**
+         * 广播包,厂商id
+         */
+        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+        public int manufacturerId = 65520; // 0xfff0
 
-        public Options setScanPeriod(int scanPeriod){
+        public Options setScanPeriod(long scanPeriod){
             this.scanPeriod = scanPeriod;
             return this;
         }
@@ -670,16 +644,16 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
             return this;
         }
 
-        public int getConnectTimeout() {
+        public long getConnectTimeout() {
             return connectTimeout;
         }
 
-        public Options setConnectTimeout(int connectTimeout) {
+        public Options setConnectTimeout(long connectTimeout) {
             this.connectTimeout = connectTimeout;
             return this;
         }
 
-        public int getScanPeriod() {
+        public long getScanPeriod() {
             return scanPeriod;
         }
 
@@ -701,6 +675,25 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
             return this;
         }
 
+        public boolean isFilterScan() {
+            return isFilterScan;
+        }
+
+        public Options setFilterScan(boolean filterScan) {
+            isFilterScan = filterScan;
+            return this;
+        }
+
+        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+        public int getManufacturerId() {
+            return manufacturerId;
+        }
+
+        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+        public void setManufacturerId(int manufacturerId) {
+            this.manufacturerId = manufacturerId;
+        }
+
         UUID[] uuid_services_extra = new UUID[]{};
         UUID uuid_service = UUID.fromString("0000fee9-0000-1000-8000-00805f9b34fb");
         UUID uuid_write_cha = UUID.fromString("d44bc439-abfd-45a2-b575-925416129600");
@@ -712,83 +705,83 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
         UUID uuid_ota_notify_cha = UUID.fromString("003784cf-f7e3-55b4-6c4c-9fd140100a16");
         UUID uuid_ota_write_cha = UUID.fromString("013784cf-f7e3-55b4-6c4c-9fd140100a16");
 
-        public UUID[] getUuid_services_extra() {
+        public UUID[] getUuidServicesExtra() {
             return uuid_services_extra;
         }
 
-        public Options setUuid_services_extra(UUID[] uuid_services_extra) {
+        public Options setUuidServicesExtra(UUID[] uuid_services_extra) {
             this.uuid_services_extra = uuid_services_extra;
             return this;
         }
 
-        public UUID getUuid_service() {
+        public UUID getUuidService() {
             return uuid_service;
         }
 
-        public Options setUuid_service(UUID uuid_service) {
+        public Options setUuidService(UUID uuid_service) {
             this.uuid_service = uuid_service;
             return this;
         }
 
-        public UUID getUuid_write_cha() {
+        public UUID getUuidWriteCha() {
             return uuid_write_cha;
         }
 
-        public Options setUuid_write_cha(UUID uuid_write_cha) {
+        public Options setUuidWriteCha(UUID uuid_write_cha) {
             this.uuid_write_cha = uuid_write_cha;
             return this;
         }
 
-        public UUID getUuid_read_cha() {
+        public UUID getUuidReadCha() {
             return uuid_read_cha;
         }
 
-        public Options setUuid_read_cha(UUID uuid_read_cha) {
+        public Options setUuidReadCha(UUID uuid_read_cha) {
             this.uuid_read_cha = uuid_read_cha;
             return this;
         }
 
-        public UUID getUuid_notify() {
+        public UUID getUuidNotify() {
             return uuid_notify;
         }
 
-        public Options setUuid_notify(UUID uuid_notify) {
+        public Options setUuidNotify(UUID uuid_notify) {
             this.uuid_notify = uuid_notify;
             return this;
         }
 
-        public UUID getUuid_notify_desc() {
+        public UUID getUuidNotifyDesc() {
             return uuid_notify_desc;
         }
 
-        public Options setUuid_notify_desc(UUID uuid_notify_desc) {
+        public Options setUuidNotifyDesc(UUID uuid_notify_desc) {
             this.uuid_notify_desc = uuid_notify_desc;
             return this;
         }
 
-        public UUID getUuid_ota_service() {
+        public UUID getUuidOtaService() {
             return uuid_ota_service;
         }
 
-        public Options setUuid_ota_service(UUID uuid_ota_service) {
+        public Options setUuidOtaService(UUID uuid_ota_service) {
             this.uuid_ota_service = uuid_ota_service;
             return this;
         }
 
-        public UUID getUuid_ota_notify_cha() {
+        public UUID getUuidOtaNotifyCha() {
             return uuid_ota_notify_cha;
         }
 
-        public Options setUuid_ota_notify_cha(UUID uuid_ota_notify_cha) {
+        public Options setUuidOtaNotifyCha(UUID uuid_ota_notify_cha) {
             this.uuid_ota_notify_cha = uuid_ota_notify_cha;
             return this;
         }
 
-        public UUID getUuid_ota_write_cha() {
+        public UUID getUuidOtaWriteCha() {
             return uuid_ota_write_cha;
         }
 
-        public Options setUuid_ota_write_cha(UUID uuid_ota_write_cha) {
+        public Options setUuidOtaWriteCha(UUID uuid_ota_write_cha) {
             this.uuid_ota_write_cha = uuid_ota_write_cha;
             return this;
         }
@@ -798,6 +791,5 @@ public class Ble<T extends BleDevice> implements BleLisenter<T>{
         }
 
     }
-
 
 }

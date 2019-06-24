@@ -2,16 +2,15 @@ package cn.com.heaton.blelibrary.ble.request;
 
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.os.Message;
-import android.support.annotation.IntRange;
 
 import java.math.BigDecimal;
 
 import cn.com.heaton.blelibrary.ble.BleHandler;
-import cn.com.heaton.blelibrary.ble.BleDevice;
+import cn.com.heaton.blelibrary.ble.model.BleDevice;
 import cn.com.heaton.blelibrary.ble.Ble;
 import cn.com.heaton.blelibrary.ble.BleStates;
 import cn.com.heaton.blelibrary.ble.BluetoothLeService;
-import cn.com.heaton.blelibrary.ble.TaskExecutor;
+import cn.com.heaton.blelibrary.ble.utils.TaskExecutor;
 import cn.com.heaton.blelibrary.ble.annotation.Implement;
 import cn.com.heaton.blelibrary.ble.callback.BleWriteCallback;
 import cn.com.heaton.blelibrary.ble.callback.BleWriteEntityCallback;
@@ -32,7 +31,7 @@ public class WriteRequest<T extends BleDevice> implements IMessage {
     private boolean isWritingEntity;
 
     protected WriteRequest() {
-        mHandler = BleHandler.getHandler();
+        mHandler = BleHandler.of();
         mHandler.setHandlerCallback(this);
     }
 
