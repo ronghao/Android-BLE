@@ -3,6 +3,7 @@ package cn.com.heaton.blelibrary.ble.request;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.os.Message;
 
+import android.util.Log;
 import java.math.BigDecimal;
 
 import cn.com.heaton.blelibrary.ble.BleHandler;
@@ -36,6 +37,7 @@ public class WriteRequest<T extends BleDevice> implements IMessage {
     }
 
     public boolean write(T device,byte[]data, BleWriteCallback<T> lisenter){
+
         this.mBleLisenter = lisenter;
         boolean result = false;
         BluetoothLeService service = Ble.getInstance().getBleService();

@@ -17,7 +17,7 @@ import cn.com.heaton.blelibrary.ble.callback.BleWriteCallback;
 
 public class AppProtocol {
 
-    private static void write(BleDevice device, byte[] data){
+    public static void write(BleDevice device, byte[] data){
         List<BleDevice> list = Ble.getInstance().getConnetedDevices();
         if(null != list && list.size() > 0){
             Ble.getInstance().write(device, getWriteData(data), bleDeviceBleWriteCallback);

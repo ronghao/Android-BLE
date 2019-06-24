@@ -9,7 +9,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 
 public interface NotifyWrapperLisenter<T> {
 
-    void onChanged(T device, BluetoothGattCharacteristic characteristic);
+    void onChanged(T device, BluetoothGattCharacteristic characteristic,byte[] data);
 
     /**
      *  Set the notification feature to be successful and can send data

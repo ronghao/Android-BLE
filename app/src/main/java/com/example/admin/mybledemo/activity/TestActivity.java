@@ -147,7 +147,7 @@ public class TestActivity extends BaseActivity {
 //        mBle.startNotify(device, mBleNotifyCallback);
         mBle.startNotify(device, new BleNotiftCallback<BleDevice>() {
             @Override
-            public void onChanged(BleDevice device, BluetoothGattCharacteristic characteristic) {
+            public void onChanged(BleDevice device, BluetoothGattCharacteristic characteristic,byte[] data) {
 
             }
         });
@@ -155,7 +155,7 @@ public class TestActivity extends BaseActivity {
 
     private BleNotiftCallback<BleDevice> mBleNotifyCallback = new BleNotiftCallback<BleDevice>() {
         @Override
-        public void onChanged(BleDevice device, BluetoothGattCharacteristic characteristic) {
+        public void onChanged(BleDevice device, BluetoothGattCharacteristic characteristic,byte[] data) {
             UUID uuid = characteristic.getUuid();
             Log.e(TAG, "onChanged: "+uuid.toString());
             Log.e(TAG, "onChanged: " + Arrays.toString(characteristic.getValue()));

@@ -198,7 +198,7 @@ public class BluetoothLeService extends Service {
 
                 if(d != null){
                     if (mNotifyWrapperLisenter != null) {
-                        mNotifyWrapperLisenter.onChanged(d, characteristic);
+                        mNotifyWrapperLisenter.onChanged(d, characteristic,characteristic.getValue());
                     }
                 }
             }
