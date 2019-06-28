@@ -9,3 +9,4 @@
 .externalNativeBuild
 blelibrary/gradle.properties
 .git-rewrite/
+.idea/
